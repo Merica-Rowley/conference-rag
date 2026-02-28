@@ -600,6 +600,11 @@ async function getEmbedding(text) {
 async function searchSentences(embedding) {
     if (!supabaseClient) throw new Error('Supabase not configured');
 
+    console.log('embedding type:', typeof embedding);
+    console.log('embedding isArray:', Array.isArray(embedding));
+    console.log('embedding length:', embedding?.length);
+    console.log('embedding sample:', embedding?.slice(0, 3));
+
     const { data, error } = await supabaseClient.rpc('match_sentences', {
         query_embedding: embedding,
         match_count: 20
