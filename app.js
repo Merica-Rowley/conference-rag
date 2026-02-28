@@ -559,6 +559,7 @@ async function askQuestion() {
         // Show source talks with per-talk similarity badges and links
         html += '<div class="result-sources"><strong>Sources:</strong></div>';
         for (const talk of topTalks) {
+            console.log('talk:', talk); // TESTING ********************************************************************
             const talkBadge = similarityBadge(talk.avgSimilarity);
             html += `<div class="result-card result-source">
                 <div class="result-card-header">
@@ -599,11 +600,6 @@ async function getEmbedding(text) {
 // Search sentences using vector similarity
 async function searchSentences(embedding) {
     if (!supabaseClient) throw new Error('Supabase not configured');
-
-    console.log('embedding type:', typeof embedding);
-    console.log('embedding isArray:', Array.isArray(embedding));
-    console.log('embedding length:', embedding?.length);
-    console.log('embedding sample:', embedding?.slice(0, 3));
 
     const { data, error } = await supabaseClient.rpc('match_sentences', {
         query_embedding: embedding,
