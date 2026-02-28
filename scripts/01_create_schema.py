@@ -102,30 +102,31 @@ TO anon, authenticated
 USING (true);
 
 -- Create function for similarity search
-CREATE OR REPLACE FUNCTION match_sentences(
+create or replace function match_sentences(
   query_embedding vector(1536),
-  match_count int DEFAULT 20
+  match_count int default 20
 )
-RETURNS TABLE (
+returns table (
   id uuid,
   talk_id uuid,
   title text,
   speaker text,
+  url text,
   text text,
   similarity float
 )
-LANGUAGE sql STABLE
-AS $$
-  SELECT
+language sql stable as $$
+  select
     sentence_embeddings.id,
     sentence_embeddings.talk_id,
     sentence_embeddings.title,
     sentence_embeddings.speaker,
+    sentence_embeddings.url,
     sentence_embeddings.text,
     1 - (sentence_embeddings.embedding <=> query_embedding) as similarity
-  FROM sentence_embeddings
-  ORDER BY sentence_embeddings.embedding <=> query_embedding
-  LIMIT match_count;
+  from sentence_embeddings
+  order by sentence_embeddings.embedding <=> query_embedding
+  limit match_count;
 $$;
 """
 
