@@ -104,7 +104,8 @@ USING (true);
 -- Create function for similarity search
 create or replace function match_sentences(
   query_embedding vector(1536),
-  match_count int default 20
+  match_count int default 20,
+  speaker_filter text default null
 )
 returns table (
   id uuid,
@@ -125,8 +126,16 @@ language sql stable as $$
     sentence_embeddings.text,
     1 - (sentence_embeddings.embedding <=> query_embedding) as similarity
   from sentence_embeddings
+  where speaker_filter is null or speaker ilike '%' || speaker_filter || '%'
   order by sentence_embeddings.embedding <=> query_embedding
   limit match_count;
+$$;
+
+-- Create function for selecting a list of speakers
+create or replace function get_distinct_speakers()
+returns table(speaker text)
+language sql stable as $$
+  select distinct speaker from sentence_embeddings order by speaker;
 $$;
 """
 

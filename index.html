@@ -94,6 +94,7 @@
                     <p class="panel-description">Search conference talks by keyword. Works once you import the
                         conference data.</p>
                     <div class="panel-input">
+                        <select id="speaker-filter-keyword"></select>
                         <input type="text" id="keyword-input" placeholder="Search by keyword..." autocomplete="off"
                             disabled />
                         <button id="keyword-btn" class="btn-primary" disabled>Search</button>
@@ -110,6 +111,7 @@
                     <p class="panel-description">Find similar content by meaning, not just keywords. Requires embeddings
                         and the embed-question Edge Function.</p>
                     <div class="panel-input">
+                        <select id="speaker-filter-semantic"></select>
                         <input type="text" id="semantic-input" placeholder="Search by meaning..." autocomplete="off"
                             disabled />
                         <button id="semantic-btn" class="btn-primary" disabled>Search</button>
@@ -126,6 +128,7 @@
                     <p class="panel-description">Get AI-generated answers based on conference talks. Requires all Edge
                         Functions deployed.</p>
                     <div class="panel-input">
+                        <select id="speaker-filter-rag"></select>
                         <input type="text" id="rag-input" placeholder="Ask a question about conference talks..."
                             autocomplete="off" disabled />
                         <button id="rag-btn" class="btn-primary" disabled>Ask</button>

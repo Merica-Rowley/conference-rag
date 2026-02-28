@@ -73,16 +73,19 @@ const keywordInput = document.getElementById('keyword-input');
 const keywordBtn = document.getElementById('keyword-btn');
 const keywordResults = document.getElementById('keyword-results');
 const keywordStatus = document.getElementById('keyword-status');
+const keywordSpeakerFilter = document.getElementById('speaker-filter-keyword');
 
 const semanticInput = document.getElementById('semantic-input');
 const semanticBtn = document.getElementById('semantic-btn');
 const semanticResults = document.getElementById('semantic-results');
 const semanticStatus = document.getElementById('semantic-status');
+const semanticSpeakerFilter = document.getElementById('speaker-filter-semantic');
 
 const ragInput = document.getElementById('rag-input');
 const ragBtn = document.getElementById('rag-btn');
 const ragResults = document.getElementById('rag-results');
 const ragStatus = document.getElementById('rag-status');
+const ragSpeakerFilter = document.getElementById('speaker-filter-rag');
 
 // ============================================
 // SETUP BANNER DETECTION
@@ -286,6 +289,7 @@ function showApp(user) {
     if (userEmailSpan) userEmailSpan.textContent = user.email;
     // Check search readiness when user logs in
     checkSearchReadiness();
+    populateSpeakerDropdowns();
 }
 
 function showMessage(text, type) {
@@ -411,16 +415,24 @@ async function keywordSearch() {
     const query = keywordInput ? keywordInput.value.trim() : '';
     if (!query || !supabaseClient) return;
 
+    const speakerFilter = keywordSpeakerFilter.value || null;
+
     showLoading(true);
     clearResults('keyword');
 
     try {
         // Search sentence_embeddings that contain the keyword (case-insensitive)
-        const { data, error } = await supabaseClient
+        let dbQuery = supabaseClient
             .from('sentence_embeddings')
             .select('text, talk_id, title, speaker, url')
             .ilike('text', `%${query}%`)
             .limit(20);
+
+        if (speakerFilter) {
+            dbQuery = dbQuery.ilike('speaker', `%${speakerFilter}%`);
+        }
+
+        const { data, error } = await dbQuery;
 
         if (error) throw new Error(`Search failed: ${error.message}`);
 
@@ -475,6 +487,8 @@ async function semanticSearch() {
     const query = semanticInput ? semanticInput.value.trim() : '';
     if (!query || !supabaseClient) return;
 
+    const speakerFilter = semanticSpeakerFilter.value || null;
+
     showLoading(true);
     clearResults('semantic');
 
@@ -483,7 +497,7 @@ async function semanticSearch() {
         const embedding = await getEmbedding(query);
 
         // Step 2: Search for similar sentences
-        const results = await searchSentences(embedding);
+        const results = await searchSentences(embedding, speakerFilter);
 
         if (!results || results.length === 0) {
             showResults('semantic', '<div class="no-results">No similar content found. Try a different query.</div>');
@@ -523,6 +537,8 @@ async function askQuestion() {
     const question = ragInput ? ragInput.value.trim() : '';
     if (!question || !supabaseClient) return;
 
+    const speakerFilter = ragSpeakerFilter.value || null;
+
     showLoading(true);
     clearResults('rag');
 
@@ -531,7 +547,7 @@ async function askQuestion() {
         const embedding = await getEmbedding(question);
 
         // Step 2: Search for similar sentences
-        const results = await searchSentences(embedding);
+        const results = await searchSentences(embedding, speakerFilter);
 
         // Step 3: Group by talk (with similarity scores and URLs)
         const topTalks = groupByTalk(results);
@@ -559,7 +575,6 @@ async function askQuestion() {
         // Show source talks with per-talk similarity badges and links
         html += '<div class="result-sources"><strong>Sources:</strong></div>';
         for (const talk of topTalks) {
-            console.log('talk:', talk); // TESTING ********************************************************************
             const talkBadge = similarityBadge(talk.avgSimilarity);
             html += `<div class="result-card result-source">
                 <div class="result-card-header">
@@ -598,14 +613,13 @@ async function getEmbedding(text) {
 }
 
 // Search sentences using vector similarity
-async function searchSentences(embedding) {
+async function searchSentences(embedding, speakerFilter = null) {
     if (!supabaseClient) throw new Error('Supabase not configured');
 
-    const { data, error } = await supabaseClient.rpc('match_sentences', {
-        query_embedding: embedding,
-        match_count: 20
-    });
+    const params = { query_embedding: embedding, match_count: 20 };
+    if (speakerFilter) params.speaker_filter = speakerFilter;
 
+    const { data, error } = await supabaseClient.rpc('match_sentences', params);
     if (error) throw new Error(`Database search failed: ${error.message}`);
     return data;
 }
@@ -695,6 +709,61 @@ async function generateAnswer(question, contextTalks) {
     }
 
     return data.answer;
+}
+
+// ============================================
+// SPEAKER FILTERS
+// ============================================
+
+// Get a list of all distinct speakers and trim results accordingly (speakers are listed as "By [Speaker Name]" or "Presented by [Speaker Name]")
+async function getDistinctSpeakers() {
+    if (!supabaseClient) throw new Error('Supabase not configured');
+
+    const { data, error } = await supabaseClient.rpc('get_distinct_speakers');
+
+    if (error) throw new Error(`Failed to get distinct speakers: ${error.message}`);
+
+    // Trim results accordingly (speakers are listed as "By [Speaker Name]" or "Presented by [Speaker Name]")
+    const prefixes = [
+        'President ', 'Elder ', 'Bishop ', 'Brother ', 'Sister '
+    ];
+
+    const trimmedData = data.map(item => {
+        let name = item.speaker.replace('By ', '').replace('Presented by ', '').trim();
+        name = name.replace(/[\u00a0\u2009\u202f\u2002\u2003]/g, ' ').trim(); // Removes non-standard whitespace
+        for (const prefix of prefixes) {
+            if (name.startsWith(prefix)) {
+                name = name.replace(prefix, '');
+                break;
+            }
+        }
+        return name;
+    });
+
+    // Deduplicate and sort
+    const uniqueSpeakers = [...new Set(trimmedData)].sort();
+    return uniqueSpeakers;
+}
+
+async function populateSpeakerDropdowns() {
+    const speakers = await getDistinctSpeakers();
+    const dropdownIds = ['speaker-filter-keyword', 'speaker-filter-semantic', 'speaker-filter-rag'];
+
+    for (const id of dropdownIds) {
+        const select = document.getElementById(id);
+        if (!select) continue;
+
+        // Add default "All Speakers" option
+        select.innerHTML = '<option value="">All Speakers</option>';
+
+        // Add one option per speaker
+        for (const speaker of speakers) {
+            const option = document.createElement('option');
+            option.value = speaker;
+            option.textContent = speaker;
+            select.appendChild(option);
+        }
+    }
 }
 
 // ============================================
